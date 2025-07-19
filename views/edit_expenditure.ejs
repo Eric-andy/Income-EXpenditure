@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Expenditure</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand navbar-light bg-light mb-4">
+    <div class="container-fluid">
+      <span class="navbar-brand">
+        <img src="/logo.png" alt="Logo" style="height:32px;width:auto;margin-right:8px;vertical-align:middle;">
+        Income & Expenditure Tracker
+      </span>
+      <div class="d-flex">
+        <a href="/report" class="btn btn-outline-primary me-2">Report</a>
+        <a href="/logout" class="btn btn-outline-danger">Logout</a>
+      </div>
+    </div>
+  </nav>
+  <div class="container mt-4">
+    <h1>Edit Expenditure</h1>
+    <form action="/expenditure/<%= record.id %>?_method=PUT" method="POST">
+      <div class="mb-3">
+        <label for="source" class="form-label">Source</label>
+        <select name="source" id="source" class="form-select" required>
+          <option value="donations" <%= record.source === 'donations' ? 'selected' : '' %>>Donations</option>
+          <option value="literature" <%= record.source === 'literature' ? 'selected' : '' %>>Literature</option>
+          <option value="district welfare" <%= record.source === 'district welfare' ? 'selected' : '' %>>District Welfare</option>
+          <option value="sunday recurrent expenditure" <%= record.source === 'sunday recurrent expenditure' ? 'selected' : '' %>>Sunday Recurrent Expenditure</option>
+          <option value="other_expenditure" <%= record.source === 'other_expenditure' ? 'selected' : '' %>>Other</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <input type="text" name="description" id="description" class="form-control" value="<%= record.description %>">
+      </div>
+      <div class="mb-3">
+        <label for="amount" class="form-label">Amount</label>
+        <input type="number" name="amount" id="amount" class="form-control" step="0.01" value="<%= record.amount %>" required>
+      </div>
+      <div class="mb-3">
+        <label for="date" class="form-label">Date</label>
+        <input type="date" name="date" id="date" class="form-control" value="<%= record.date %>" required>
+        <div class="form-text">Current: <strong><%= (() => { const d = new Date(record.date); return (d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear()); })() %></strong></div>
+      </div>
+      <button type="submit" class="btn btn-danger">Update Expenditure</button>
+      <a href="/expenditure" class="btn btn-secondary">Cancel</a>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Income & Expenditure Report</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    @media print {
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center">
+        <img src="/logo.png" alt="Logo" style="height:48px;width:auto;margin-right:12px;">
+        <div>
+          <h2 class="mb-0">Egyir Paintsil Assembly </h2>
+          <small class="text-muted">Income & Expense Report</small>
+        </div>
+      </div>
+      <button class="btn btn-primary no-print" onclick="window.print()">Print</button>
+    </div>
+    <form action="/report" method="GET" class="row g-3 no-print mb-4">
+      <div class="col-auto">
+        <label for="from" class="form-label">From</label>
+        <input type="date" name="from" id="from" class="form-control" value="<%= from %>" required>
+      </div>
+      <div class="col-auto">
+        <label for="to" class="form-label">To</label>
+        <input type="date" name="to" id="to" class="form-control" value="<%= to %>" required>
+      </div>
+      <div class="col-auto align-self-end">
+        <button type="submit" class="btn btn-success">Generate</button>
+      </div>
+    </form>
+    <% if (records && records.length > 0) { %>
+      <h4>Summary (<%= from %> to <%= to %>)</h4>
+      <ul>
+        <li><strong>Total Income:</strong> GHS <%= income.toFixed(2) %></li>
+        <li><strong>Total Expenditure:</strong> GHS <%= expenditure.toFixed(2) %></li>
+        <li><strong>Balance:</strong> GHS <%= (income - expenditure).toFixed(2) %></li>
+      </ul>
+      <h4>Records</h4>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Source</th>
+            <th>Description</th>
+            <th>Amount (GHS)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+          } %>
+          <% records.forEach(function(record) { %>
+            <tr>
+              <td><%= formatDate(record.date) %></td>
+              <td><%= record.type %></td>
+              <td><%= record.source %></td>
+              <td><%= record.description %></td>
+              <td><%= record.amount.toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else if (from && to) { %>
+      <div class="alert alert-warning">No records found for this period.</div>
+    <% } %>
+    <a href="/" class="btn btn-secondary no-print mt-3">Back to Summary</a>
+  </div>
+</body>
+</html>
