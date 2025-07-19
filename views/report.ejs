@@ -30,6 +30,32 @@
         <label for="to" class="form-label">To</label>
         <input type="date" name="to" id="to" class="form-control" value="<%= to %>" required>
       </div>
+      <div class="col-auto">
+        <label for="sourceType" class="form-label">Type</label>
+        <select name="sourceType" id="sourceType" class="form-select" onchange="this.form.submit()">
+          <option value="">All</option>
+          <option value="income" <%= sourceType === 'income' ? 'selected' : '' %>>Income</option>
+          <option value="expenditure" <%= sourceType === 'expenditure' ? 'selected' : '' %>>Expenditure</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label for="sourceName" class="form-label">Source</label>
+        <select name="sourceName" id="sourceName" class="form-select">
+          <option value="">All</option>
+          <% if (sourceType === 'income') { %>
+            <option value="freewill" <%= sourceName === 'freewill' ? 'selected' : '' %>>Freewill</option>
+            <option value="main offering" <%= sourceName === 'main offering' ? 'selected' : '' %>>Main Offering</option>
+            <option value="LDF" <%= sourceName === 'LDF' ? 'selected' : '' %>>LDF</option>
+            <option value="other_income" <%= sourceName === 'other_income' ? 'selected' : '' %>>Other</option>
+          <% } else if (sourceType === 'expenditure') { %>
+            <option value="donations" <%= sourceName === 'donations' ? 'selected' : '' %>>Donations</option>
+            <option value="literature" <%= sourceName === 'literature' ? 'selected' : '' %>>Literature</option>
+            <option value="district welfare" <%= sourceName === 'district welfare' ? 'selected' : '' %>>District Welfare</option>
+            <option value="Sunday recurrent expenditure" <%= sourceName === 'Sunday recurrent expenditure' ? 'selected' : '' %>>Sunday Recurrent Expenditure</option>
+            <option value="other" <%= sourceName === 'other' ? 'selected' : '' %>>Other</option>
+          <% } %>
+        </select>
+      </div>
       <div class="col-auto align-self-end">
         <button type="submit" class="btn btn-success">Generate</button>
       </div>
@@ -40,6 +66,9 @@
         <li><strong>Total Income:</strong> GHS <%= income.toFixed(2) %></li>
         <li><strong>Total Expenditure:</strong> GHS <%= expenditure.toFixed(2) %></li>
         <li><strong>Balance:</strong> GHS <%= (income - expenditure).toFixed(2) %></li>
+        <% if (sourceType && sourceName) { %>
+          <li><strong>Sum for <%= sourceType.charAt(0).toUpperCase() + sourceType.slice(1) %> Source "<%= sourceName %>":</strong> GHS <%= sumSource.toFixed(2) %></li>
+        <% } %>
       </ul>
       <h4>Records</h4>
       <table class="table table-bordered">

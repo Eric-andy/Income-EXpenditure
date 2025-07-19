@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const session = require('express-session');
 const { authRouter, requireAuth } = require('./auth');
@@ -171,14 +170,35 @@ app.put('/expenditure/:id', (req, res) => {
 app.get('/report', requireAuth, (req, res) => {
   const from = req.query.from || '';
   const to = req.query.to || '';
+  const sourceType = req.query.sourceType || '';
+  const sourceName = req.query.sourceName || '';
   if (!from || !to) {
-    return res.render('report', { records: [], income: 0, expenditure: 0, from, to });
+    return res.render('report', { records: [], income: 0, expenditure: 0, from, to, sourceType, sourceName, sumSource: 0 });
   }
   db.all('SELECT * FROM records WHERE date >= ? AND date <= ? ORDER BY date ASC', [from, to], (err, rows) => {
     if (err) return res.status(500).send('Database error');
     const income = rows.filter(r => r.type === 'income').reduce((a, b) => a + b.amount, 0);
     const expenditure = rows.filter(r => r.type === 'expenditure').reduce((a, b) => a + b.amount, 0);
-    res.render('report', { records: rows, income, expenditure, from, to });
+    let filteredRows = rows;
+    let sumSource = 0;
+    if (sourceType && sourceName) {
+      filteredRows = rows.filter(r => r.type === sourceType && r.source === sourceName);
+      sumSource = filteredRows.reduce((a, b) => a + b.amount, 0);
+    } else if (sourceType) {
+      filteredRows = rows.filter(r => r.type === sourceType);
+    } else if (sourceName) {
+      filteredRows = rows.filter(r => r.source === sourceName);
+    }
+    res.render('report', {
+      records: filteredRows,
+      income,
+      expenditure,
+      from,
+      to,
+      sourceType,
+      sourceName,
+      sumSource
+    });
   });
 });
 
