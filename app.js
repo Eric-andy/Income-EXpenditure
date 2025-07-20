@@ -15,7 +15,10 @@ types.setTypeParser(1700, (val) => {
 });
 
 const db = new Pool({
-  connectionString: process.env.DATABASE_URL 
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    ca: process.env.SSL,
+  } 
 });
 
 app.set('view engine', 'ejs');
