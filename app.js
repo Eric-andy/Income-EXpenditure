@@ -128,9 +128,17 @@ app.post('/expenditure', async (req, res) => {
 
 // Delete record
 app.post('/delete/:id', async (req, res) => {
+ 
   try {
+     const record = await db.query('SELECT * FROM records WHERE id = $1', [req.params.id]);
+  if(!record.rows[0]) {
+    return res.status(404).send('Record not found');
+  }
+  const recordType = record.rows[0].type;
+  console.log('Deleting record of type:', recordType);
+
     await db.query('DELETE FROM records WHERE id = $1', [req.params.id]);
-    res.redirect('/');
+    res.redirect(`/${recordType}`);
   } catch (err) {
     return res.status(500).send('Database error');
   }
