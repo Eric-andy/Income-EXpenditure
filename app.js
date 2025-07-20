@@ -13,7 +13,6 @@ const app = express();
 types.setTypeParser(1700, (val) => {
   return val === null ? null : parseFloat(val);
 });
-
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
