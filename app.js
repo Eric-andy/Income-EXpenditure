@@ -5,11 +5,18 @@ const methodOverride = require('method-override');
 
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool,types } = require('pg');
 const bodyParser = require('body-parser');
 
 const app = express();
-const db = new sqlite3.Database('./public/database.db');
+// Override for NUMERIC (OID 1700) — parse as float
+types.setTypeParser(1700, (val) => {
+  return val === null ? null : parseFloat(val);
+});
+
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL 
+});
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -38,136 +45,147 @@ app.use((req, res, next) => {
   return requireAuth(req, res, next);
 });
 
-
 // Create tables if not exist
 const createTable = `
 CREATE TABLE IF NOT EXISTS records (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL,
-  source TEXT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  type VARCHAR(50) NOT NULL,
+  source VARCHAR(100) NOT NULL,
   description TEXT NOT NULL,
-  amount REAL NOT NULL,
-  date TEXT NOT NULL
+  amount NUMERIC(12,2) NOT NULL,
+  date DATE NOT NULL
 );
 `;
-db.run(createTable);
-
+db.query(createTable).catch(err => console.error('Error creating table:', err));
 
 // Home page: summary only
-app.get('/', (req, res) => {
-  db.all('SELECT * FROM records', [], (err, rows) => {
-    if (err) return res.status(500).send('Database error');
-    const income = rows.filter(r => r.type === 'income').reduce((a, b) => a + b.amount, 0);
-    const expenditure = rows.filter(r => r.type === 'expenditure').reduce((a, b) => a + b.amount, 0);
+app.get('/', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM records');
+    const income = rows.filter(r => r.type === 'income').reduce((a, b) => a + parseFloat(b.amount), 0);
+    const expenditure = rows.filter(r => r.type === 'expenditure').reduce((a, b) => a + parseFloat(b.amount), 0);
     res.render('index', { records: [], income, expenditure });
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Income page: list income records and form
-app.get('/income', (req, res) => {
-  db.all('SELECT * FROM records WHERE type = ? ORDER BY date DESC', ['income'], (err, rows) => {
-    if (err) return res.status(500).send('Database error');
+app.get('/income', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM records WHERE type = $1 ORDER BY date DESC', ['income']);
     res.render('income', { records: rows });
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Expenditure page: list expenditure records and form
-app.get('/expenditure', (req, res) => {
-  db.all('SELECT * FROM records WHERE type = ? ORDER BY date DESC', ['expenditure'], (err, rows) => {
-    if (err) return res.status(500).send('Database error');
+app.get('/expenditure', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM records WHERE type = $1 ORDER BY date DESC', ['expenditure']);
     res.render('expenditure', { records: rows });
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
-
-// Add record form
 
 // Add record selection page
 app.get('/add', (req, res) => {
   res.render('add');
 });
 
-// Remove /add/income and /add/expenditure GET routes (handled in /income and /expenditure pages)
-
-// Add record POST
-
 // Add income POST
-app.post('/income', (req, res) => {
+app.post('/income', async (req, res) => {
   const { source, description, amount, date } = req.body;
   if (parseFloat(amount) < 0) {
     return res.status(400).send('Amount cannot be negative');
   }
-  db.run('INSERT INTO records (type, source, description, amount, date) VALUES (?, ?, ?, ?, ?)', ['income', source, description, amount, date], (err) => {
-    if (err){ 
-        console.error(err);
-        return res.status(500).send('Database error');
-    } 
+  try {
+    await db.query('INSERT INTO records (type, source, description, amount, date) VALUES ($1, $2, $3, $4, $5)', ['income', source, description, amount, date]);
     res.redirect('/income');
-  });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send('Database error');
+  }
 });
 
 // Add expenditure POST
-app.post('/expenditure', (req, res) => {
+app.post('/expenditure', async (req, res) => {
   const { source, description, amount, date } = req.body;
   if (parseFloat(amount) < 0) {
     return res.status(400).send('Amount cannot be negative');
   }
-  db.run('INSERT INTO records (type, source, description, amount, date) VALUES (?, ?, ?, ?, ?)', ['expenditure', source, description, amount, date], (err) => {
-    if (err) return res.status(500).send('Database error');
+  try {
+    await db.query('INSERT INTO records (type, source, description, amount, date) VALUES ($1, $2, $3, $4, $5)', ['expenditure', source, description, amount, date]);
     res.redirect('/expenditure');
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Delete record
-app.post('/delete/:id', (req, res) => {
-  db.run('DELETE FROM records WHERE id = ?', [req.params.id], (err) => {
-    if (err) return res.status(500).send('Database error');
+app.post('/delete/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM records WHERE id = $1', [req.params.id]);
     res.redirect('/');
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
-
 // Edit income GET
-app.get('/income/:id/edit', (req, res) => {
-  db.get('SELECT * FROM records WHERE id = ? AND type = ?', [req.params.id, 'income'], (err, row) => {
-    if (err || !row) return res.status(404).send('Income record not found');
-    res.render('edit_income', { record: row });
-  });
+app.get('/income/:id/edit', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM records WHERE id = $1 AND type = $2', [req.params.id, 'income']);
+    if (!rows[0]) return res.status(404).send('Income record not found');
+    res.render('edit_income', { record: rows[0] });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Edit income PUT
-app.put('/income/:id', (req, res) => {
+app.put('/income/:id', async (req, res) => {
   const { source, description, amount, date } = req.body;
   if (parseFloat(amount) < 0) {
     return res.status(400).send('Amount cannot be negative');
   }
-  db.run('UPDATE records SET source = ?, description = ?, amount = ?, date = ? WHERE id = ? AND type = ?', [source, description, amount, date, req.params.id, 'income'], (err) => {
-    if (err) return res.status(500).send('Database error');
+  try {
+    await db.query('UPDATE records SET source = $1, description = $2, amount = $3, date = $4 WHERE id = $5 AND type = $6', [source, description, amount, date, req.params.id, 'income']);
     res.redirect('/income');
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Edit expenditure GET
-app.get('/expenditure/:id/edit', (req, res) => {
-  db.get('SELECT * FROM records WHERE id = ? AND type = ?', [req.params.id, 'expenditure'], (err, row) => {
-    if (err || !row) return res.status(404).send('Expenditure record not found');
-    res.render('edit_expenditure', { record: row });
-  });
+app.get('/expenditure/:id/edit', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM records WHERE id = $1 AND type = $2', [req.params.id, 'expenditure']);
+    if (!rows[0]) return res.status(404).send('Expenditure record not found');
+    res.render('edit_expenditure', { record: rows[0] });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Edit expenditure PUT
-app.put('/expenditure/:id', (req, res) => {
+app.put('/expenditure/:id', async (req, res) => {
   const { source, description, amount, date } = req.body;
   if (parseFloat(amount) < 0) {
     return res.status(400).send('Amount cannot be negative');
   }
-  db.run('UPDATE records SET source = ?, description = ?, amount = ?, date = ? WHERE id = ? AND type = ?', [source, description, amount, date, req.params.id, 'expenditure'], (err) => {
-    if (err) return res.status(500).send('Database error');
+  try {
+    await db.query('UPDATE records SET source = $1, description = $2, amount = $3, date = $4 WHERE id = $5 AND type = $6', [source, description, amount, date, req.params.id, 'expenditure']);
     res.redirect('/expenditure');
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
 
 // Report page: select dates and show report
-app.get('/report', requireAuth, (req, res) => {
+app.get('/report', requireAuth, async (req, res) => {
   const from = req.query.from || '';
   const to = req.query.to || '';
   const sourceType = req.query.sourceType || '';
@@ -175,15 +193,15 @@ app.get('/report', requireAuth, (req, res) => {
   if (!from || !to) {
     return res.render('report', { records: [], income: 0, expenditure: 0, from, to, sourceType, sourceName, sumSource: 0 });
   }
-  db.all('SELECT * FROM records WHERE date >= ? AND date <= ? ORDER BY date ASC', [from, to], (err, rows) => {
-    if (err) return res.status(500).send('Database error');
-    const income = rows.filter(r => r.type === 'income').reduce((a, b) => a + b.amount, 0);
-    const expenditure = rows.filter(r => r.type === 'expenditure').reduce((a, b) => a + b.amount, 0);
+  try {
+    const { rows } = await db.query('SELECT * FROM records WHERE date >= $1 AND date <= $2 ORDER BY date ASC', [from, to]);
+    const income = rows.filter(r => r.type === 'income').reduce((a, b) => a + parseFloat(b.amount), 0);
+    const expenditure = rows.filter(r => r.type === 'expenditure').reduce((a, b) => a + parseFloat(b.amount), 0);
     let filteredRows = rows;
     let sumSource = 0;
     if (sourceType && sourceName) {
       filteredRows = rows.filter(r => r.type === sourceType && r.source === sourceName);
-      sumSource = filteredRows.reduce((a, b) => a + b.amount, 0);
+      sumSource = filteredRows.reduce((a, b) => a + parseFloat(b.amount), 0);
     } else if (sourceType) {
       filteredRows = rows.filter(r => r.type === sourceType);
     } else if (sourceName) {
@@ -199,10 +217,10 @@ app.get('/report', requireAuth, (req, res) => {
       sourceName,
       sumSource
     });
-  });
+  } catch (err) {
+    return res.status(500).send('Database error');
+  }
 });
-
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
